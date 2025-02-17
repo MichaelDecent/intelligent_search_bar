@@ -226,16 +226,3 @@ def openai_function_call(user_query: str, account_id: str) -> Dict[str, Any]:
 
     except Exception as e:
         raise Exception(f"Error during OpenAI API call: {str(e)}")
-
-
-# if __name__ == "__main__":
-#     # Example usage
-#     user_query = "Hello, show me the last 5 transactions."
-#     response = openai_function_call(user_query, "7807b493-fe43-4d97-b117-4298a3c24dbe")
-#     print(response)
-
-# Example usage with generate_function_schema
-# print(generate_function_schema(sql_queries.get_transactions_by_date))
-
-# Example usage with call_function_by_name
-# result = print(call_function_by_name("get_last_5_transactions", {}))
