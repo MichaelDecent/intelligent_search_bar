@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException
 from app.functions.function_caller import openai_function_call
 from app.schema.user import UserQuery, UserResponse
 
-router = APIRouter()
+router = APIRouter(tags=["Search"])
 
 
 @router.post("/ai-search", response_model=UserResponse)

@@ -188,55 +188,87 @@ def get_transactions_by_exact_amount(amount: float, account_id: str):
 
 def get_deposits(account_id: str):
     """
-    Get all deposit transactions for an account.
+    Get total deposit amount and category with highest deposit amount for an account.
 
     Args:
         account_id (str): The unique identifier of the account.
 
     Returns:
-        List[Dict]: A list of deposit transaction records.
+        Dict: Contains total_deposits and category with highest deposit amount
     """
     query = f"""
-        SELECT *
+        WITH deposit_totals AS (
+            SELECT 
+                category,
+                SUM(amount) as category_total
+            FROM new_table 
+            WHERE transaction_type ILIKE '%credit%'
+                AND account_id = '{account_id}'
+            GROUP BY category
+            ORDER BY category_total DESC
+            LIMIT 1
+        )
+        SELECT 
+            COALESCE(SUM(amount), 0) as total_deposits,
+            (SELECT category FROM deposit_totals) as highest_deposit_category,
+            (SELECT category_total FROM deposit_totals) as highest_category_amount
         FROM new_table
-        WHERE transaction_type ILIKE '%deposit%'
-          AND account_id = '{account_id}';
+        WHERE transaction_type ILIKE '%credit%'
+            AND account_id = '{account_id}';
     """
     return execute_sql(query)
 
 
 def get_withdrawals(account_id: str):
     """
-    Get all withdrawal transactions for an account.
+    Get total withdrawal amount and category with highest withdrawal amount for an account.
 
     Args:
         account_id (str): The unique identifier of the account.
 
     Returns:
-        List[Dict]: A list of withdrawal transaction records.
+        Dict: Contains total_withdrawals and category with highest withdrawal amount
     """
     query = f"""
-        SELECT *
+        WITH withdrawal_totals AS (
+            SELECT 
+                category,
+                SUM(amount) as category_total
+            FROM new_table 
+            WHERE transaction_type ILIKE '%debit%'
+                AND account_id = '{account_id}'
+            GROUP BY category
+            ORDER BY category_total DESC
+            LIMIT 1
+        )
+        SELECT 
+            COALESCE(SUM(amount), 0) as total_withdrawals,
+            (SELECT category FROM withdrawal_totals) as highest_withdrawal_category,
+            (SELECT category_total FROM withdrawal_totals) as highest_category_amount
         FROM new_table
-        WHERE transaction_type ILIKE '%withdrawal%'
-          AND account_id = '{account_id}';
+        WHERE transaction_type ILIKE '%debit%'
+            AND account_id = '{account_id}';
     """
     return execute_sql(query)
 
 
 def get_transactions_by_category(category: str, account_id: str):
     """
-    Get all transactions in a specific category for an account.
+    Get the total amounts for credit and debit transactions, as well as the overall sum,
+    for a specific category and account.
 
     Args:
-        category (str): The category to filter transactions by.
+        category (str): The transaction category to filter by.
         account_id (str): The unique identifier of the account.
 
     Returns:
-        List[Dict]: A list of transaction records in the specified category.
+        Dict: A dictionary containing 'credit_amount', 'debit_amount', and 'total_amount'.
     """
     query = f"""
-        SELECT *
+        SELECT 
+            SUM(CASE WHEN transaction_type ILIKE '%credit%' THEN amount ELSE 0 END) AS credit_amount,
+            SUM(CASE WHEN transaction_type ILIKE '%debit%' THEN amount ELSE 0 END) AS debit_amount,
+            SUM(amount) AS total_amount
         FROM new_table
         WHERE category ILIKE '{category}'
           AND account_id = '{account_id}';
@@ -272,17 +304,20 @@ def get_transactions_by_narration_keyword(keyword: str, account_id: str):
 
 def get_transactions_by_account_number(account_number: str, account_id: str):
     """
-    Get all transactions for a specific account number.
+    Get credit amount, debit amount and total sum for transactions from a specific account number.
 
     Args:
         account_number (str): The account number to filter by.
         account_id (str): The unique identifier of the account.
 
     Returns:
-        List[Dict]: A list of transaction records for the specified account number.
+        Dict: A dictionary containing credit_amount, debit_amount and total_amount for the account.
     """
     query = f"""
-        SELECT *
+        SELECT 
+            SUM(CASE WHEN transaction_type ILIKE '%credit%' THEN amount ELSE 0 END) AS credit_amount,
+            SUM(CASE WHEN transaction_type ILIKE '%debit%' THEN amount ELSE 0 END) AS debit_amount,
+            SUM(amount) AS total_amount
         FROM new_table
         WHERE account_number = '{account_number}'
           AND account_id = '{account_id}';
@@ -292,17 +327,20 @@ def get_transactions_by_account_number(account_number: str, account_id: str):
 
 def get_transactions_by_bank_name(bank_name: str, account_id: str):
     """
-    Get all transactions associated with a specific bank.
+    Get credit amount, debit amount and total sum for transactions from a specific bank.
 
     Args:
         bank_name (str): The name of the bank to filter by.
         account_id (str): The unique identifier of the account.
 
     Returns:
-        List[Dict]: A list of transaction records from the specified bank.
+        Dict: A dictionary containing credit_amount, debit_amount and total_amount for the bank.
     """
     query = f"""
-        SELECT *
+        SELECT 
+            SUM(CASE WHEN transaction_type ILIKE '%credit%' THEN amount ELSE 0 END) AS credit_amount,
+            SUM(CASE WHEN transaction_type ILIKE '%debit%' THEN amount ELSE 0 END) AS debit_amount,
+            SUM(amount) AS total_amount
         FROM new_table
         WHERE bank_name ILIKE '{bank_name}'
           AND account_id = '{account_id}';
@@ -312,16 +350,19 @@ def get_transactions_by_bank_name(bank_name: str, account_id: str):
 
 def get_transactions_by_account_id(account_id: str):
     """
-    Get all transactions for a specific account ID.
+    Get credit amount, debit amount and total sum for a specific account ID.
 
     Args:
         account_id (str): The unique identifier of the account (UUID format).
 
     Returns:
-        List[Dict]: A list of transaction records associated with the account ID.
+        Dict: A dictionary containing credit_amount, debit_amount and total_amount for the account.
     """
     query = f"""
-        SELECT *
+        SELECT 
+            SUM(CASE WHEN transaction_type ILIKE '%credit%' THEN amount ELSE 0 END) AS credit_amount,
+            SUM(CASE WHEN transaction_type ILIKE '%debit%' THEN amount ELSE 0 END) AS debit_amount,
+            SUM(amount) AS total_amount
         FROM new_table
         WHERE account_id = '{account_id}';
     """
@@ -330,17 +371,20 @@ def get_transactions_by_account_id(account_id: str):
 
 def get_transactions_by_mono_connection_id(mono_connection_id: str, account_id: str):
     """
-    Get transactions for a specific Mono connection ID.
+    Get credit amount, debit amount and total sum for a specific Mono connection ID.
 
     Args:
         mono_connection_id (str): The Mono connection ID to filter by.
         account_id (str): The unique identifier of the account.
 
     Returns:
-        List[Dict]: A list of transaction records for the specified connection.
+        Dict: A dictionary containing credit_amount, debit_amount and total_amount for the connection.
     """
     query = f"""
-        SELECT *
+        SELECT 
+            SUM(CASE WHEN transaction_type ILIKE '%credit%' THEN amount ELSE 0 END) AS credit_amount,
+            SUM(CASE WHEN transaction_type ILIKE '%debit%' THEN amount ELSE 0 END) AS debit_amount,
+            SUM(amount) AS total_amount
         FROM new_table
         WHERE mono_connection_id = '{mono_connection_id}'
           AND account_id = '{account_id}';
@@ -353,63 +397,23 @@ def get_transactions_by_mono_connection_id(mono_connection_id: str, account_id: 
 
 def get_transactions_by_currency(currency: str, account_id: str):
     """
-    Get all transactions in a specified currency.
+    Get credit amount, debit amount and total sum for transactions in a specified currency.
 
     Args:
         currency (str): The currency code to filter by (e.g., 'USD', 'NGN').
         account_id (str): The unique identifier of the account.
 
     Returns:
-        List[Dict]: A list of transaction records in the specified currency.
+        Dict: A dictionary containing credit_amount, debit_amount and total_amount for the currency.
     """
     query = f"""
-        SELECT *
+        SELECT 
+            SUM(CASE WHEN transaction_type ILIKE '%credit%' THEN amount ELSE 0 END) AS credit_amount,
+            SUM(CASE WHEN transaction_type ILIKE '%debit%' THEN amount ELSE 0 END) AS debit_amount,
+            SUM(amount) AS total_amount
         FROM new_table
         WHERE currency = '{currency}'
           AND account_id = '{account_id}';
-    """
-    return execute_sql(query)
-
-
-# 8. Detailed Transaction Lookup
-
-
-def get_transaction_by_transaction_id(transaction_id: str, account_id: str):
-    """
-    Get details for a specific transaction by its ID.
-
-    Args:
-        transaction_id (str): The unique identifier of the transaction.
-        account_id (str): The unique identifier of the account.
-
-    Returns:
-        Dict: The transaction record matching the specified ID.
-    """
-    query = f"""
-        SELECT *
-        FROM new_table
-        WHERE transaction_id = '{transaction_id}'
-          AND account_id = '{account_id}';
-    """
-    return execute_sql(query)
-
-
-def get_last_transaction_narration_and_amount(account_id: str):
-    """
-    Get the narration and amount of the most recent transaction.
-
-    Args:
-        account_id (str): The unique identifier of the account.
-
-    Returns:
-        Dict: A dictionary containing the narration and amount of the most recent transaction.
-    """
-    query = f"""
-        SELECT narration, amount
-        FROM new_table
-        WHERE account_id = '{account_id}'
-        ORDER BY "date" DESC
-        LIMIT 1;
     """
     return execute_sql(query)
 
@@ -527,5 +531,33 @@ def get_transactions_created_last_week(account_id: str):
         FROM new_table
         WHERE created_at >= current_date - interval '7 days'
           AND account_id = '{account_id}';
+    """
+    return execute_sql(query)
+
+
+def get_transactions_by_keyword(keyword: str, account_id: str):
+    """
+    Get credit amount, debit amount and total sum for transactions matching a keyword
+    in bank_name, category, or transaction_type (in that order).
+
+    Args:
+        keyword (str): Keyword to search across bank_name, category and transaction_type columns
+        account_id (str): The user's account ID to scope the query
+
+    Returns:
+        Dict: A dictionary containing credit_amount, debit_amount and total_amount for matches
+    """
+    query = f"""
+        SELECT
+            SUM(CASE WHEN transaction_type ILIKE '%credit%' THEN amount ELSE 0 END) AS credit_amount_{keyword},
+            SUM(CASE WHEN transaction_type ILIKE '%debit%' THEN amount ELSE 0 END) AS debit_amount_{keyword},
+            SUM(amount) AS total_amount_{keyword}
+        FROM new_table
+        WHERE account_id = '{account_id}'
+          AND (
+              bank_name ILIKE '%{keyword}%' OR
+              category ILIKE '%{keyword}%' OR
+              transaction_type ILIKE '%{keyword}%'
+          );
     """
     return execute_sql(query)

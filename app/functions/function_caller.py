@@ -31,13 +31,12 @@ FUNCTION_MAP: Dict[str, Callable] = {
     "get_transactions_by_account_id": sql_queries.get_transactions_by_account_id,
     "get_transactions_by_mono_connection_id": sql_queries.get_transactions_by_mono_connection_id,
     "get_transactions_by_currency": sql_queries.get_transactions_by_currency,
-    "get_transaction_by_transaction_id": sql_queries.get_transaction_by_transaction_id,
-    "get_last_transaction_narration_and_amount": sql_queries.get_last_transaction_narration_and_amount,
     "get_withdrawals_over_last_days": sql_queries.get_withdrawals_over_last_days,
     "get_transactions_by_bank_and_category": sql_queries.get_transactions_by_bank_and_category,
     "get_transactions_between_amounts_and_category": sql_queries.get_transactions_between_amounts_and_category,
     "get_transactions_updated_since": sql_queries.get_transactions_updated_since,
     "get_transactions_created_last_week": sql_queries.get_transactions_created_last_week,
+    "get_transactions_by_keyword": sql_queries.get_transactions_by_keyword,
 }
 
 client = OpenAI(api_key=OPENAI_API_KEY)
@@ -91,16 +90,18 @@ def generate_functions_list() -> list:
     based on the FUNCTION_MAP. The description is taken from the function's
     docstring (if provided), and the parameters are generated automatically.
     """
-    functions = []
-    for func_name, func in FUNCTION_MAP.items():
-        function_definition = {
-            "name": func_name,
-            "description": func.__doc__
-            or f"Automatically generated function for {func_name}.",
-            "parameters": generate_function_schema(func),
+    return [
+        {
+            "type": "function",
+            "function": {
+                "name": func_name,
+                "description": func.__doc__
+                or f"Automatically generated function for {func_name}.",
+                "parameters": generate_function_schema(func),
+            },
         }
-        functions.append(function_definition)
-    return functions
+        for func_name, func in FUNCTION_MAP.items()
+    ]
 
 
 def call_function_by_name(function_name: str, arguments: Dict[str, Any]) -> Any:
@@ -171,21 +172,16 @@ def openai_function_call(user_query: str, account_id: str) -> Dict[str, Any]:
         Dict[str, Any]: Dictionary containing the function call results or direct response
     """
     # Convert our functions list to OpenAI's new tools format
-    tools = [
-        {
-            "type": "function",
-            "function": {
-                "name": func_name,
-                "description": func.__doc__
-                or f"Automatically generated function for {func_name}.",
-                "parameters": generate_function_schema(func),
-            },
-        }
-        for func_name, func in FUNCTION_MAP.items()
-    ]
+    tools = generate_functions_list()
 
     # Create messages list
-    messages = [{"role": "user", "content": user_query}]
+    messages = [
+        {"role": "user", "content": user_query},
+        {
+            "role": "system",
+            "content": "You are a helpful financial assistant. When given a keyword, fetch and summarize credit, debit, and total amounts for transactions matching that keyword",
+        },
+    ]
 
     # Make API call with new format
     try:
