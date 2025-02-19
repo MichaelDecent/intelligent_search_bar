@@ -3,22 +3,35 @@ from app.database.execute_sql import execute_sql
 # 1. Recent Activity & Balance
 
 
-def get_last_5_transactions(account_id: str):
+def get_recent_transactions(account_id: str):
     """
-    Get the 5 most recent transactions for a specific account.
+    Get the 3 most recent transactions for a specific account, retrieving the amount,
+    transaction type, category, bank name, balance after the transaction, and the sum
+    of these 3 transactions.
 
     Args:
         account_id (str): The unique identifier of the account.
 
     Returns:
-        List[Dict]: A list of the 5 most recent transaction records.
+        List[Dict]: A list of the 3 most recent transaction records with the required columns.
     """
     query = f"""
-        SELECT *
-        FROM new_table
-        WHERE account_id = '{account_id}'
-        ORDER BY "date" DESC
-        LIMIT 5;
+        WITH recent_transactions AS (
+            SELECT 
+                amount,
+                transaction_type,
+                category,
+                bank_name,
+                balance_after
+            FROM new_table
+            WHERE account_id = '{account_id}'
+            ORDER BY "date" DESC
+            LIMIT 3
+        )
+        SELECT 
+            rt.*,
+            (SELECT SUM(amount) FROM recent_transactions) as total_amount_of_3_transactions
+        FROM recent_transactions rt;
     """
     return execute_sql(query)
 
@@ -45,19 +58,47 @@ def get_current_balance(account_id: str):
 
 def get_all_transactions(account_id: str):
     """
-    Get all transactions for an account ordered by most recent first.
+    Get aggregate sums for all transactions for an account, including the total sum,
+    the sum for debit transactions, the sum for credit transactions, and the categories
+    with the highest debit and credit amounts (along with their sums).
 
     Args:
         account_id (str): The unique identifier of the account.
 
     Returns:
-        List[Dict]: A list of all transaction records ordered by date descending.
+        Dict: A dictionary containing total_amount, total_credit, total_debit,
+              highest_credit_category, highest_credit_amount, highest_debit_category,
+              and highest_debit_amount.
     """
     query = f"""
-        SELECT *
+        WITH highest_credit AS (
+            SELECT category, SUM(amount) AS credit_sum
+            FROM new_table
+            WHERE transaction_type ILIKE '%credit%'
+              AND account_id = '{account_id}'
+            GROUP BY category
+            ORDER BY credit_sum DESC
+            LIMIT 1
+        ),
+        highest_debit AS (
+            SELECT category, SUM(amount) AS debit_sum
+            FROM new_table
+            WHERE transaction_type ILIKE '%debit%'
+              AND account_id = '{account_id}'
+            GROUP BY category
+            ORDER BY debit_sum DESC
+            LIMIT 1
+        )
+        SELECT 
+            SUM(amount) AS total_amount,
+            SUM(CASE WHEN transaction_type ILIKE '%credit%' THEN amount ELSE 0 END) AS total_credit,
+            SUM(CASE WHEN transaction_type ILIKE '%debit%' THEN amount ELSE 0 END) AS total_debit,
+            (SELECT category FROM highest_credit) AS highest_credit_category,
+            (SELECT credit_sum FROM highest_credit) AS highest_credit_amount,
+            (SELECT category FROM highest_debit) AS highest_debit_category,
+            (SELECT debit_sum FROM highest_debit) AS highest_debit_amount
         FROM new_table
-        WHERE account_id = '{account_id}'
-        ORDER BY "date" DESC;
+        WHERE account_id = '{account_id}';
     """
     return execute_sql(query)
 
@@ -67,17 +108,23 @@ def get_all_transactions(account_id: str):
 
 def get_transactions_by_date(date_str: str, account_id: str):
     """
-    Get all transactions for a specific date and account.
+    Get all transactions for a specific date and account, retrieving individual amounts, category,
+    transaction type and bank name used to make the transaction.
 
     Args:
         date_str (str): Date in YYYY-MM-DD format.
         account_id (str): The unique identifier of the account.
 
     Returns:
-        List[Dict]: A list of transaction records for the given date.
+        List[Dict]: A list of transaction records with the individual amount, category,
+                    transaction type and bank name.
     """
     query = f"""
-        SELECT *
+        SELECT 
+            amount,
+            category,
+            transaction_type,
+            bank_name
         FROM new_table
         WHERE DATE("date") = '{date_str}'
           AND account_id = '{account_id}';
@@ -87,7 +134,8 @@ def get_transactions_by_date(date_str: str, account_id: str):
 
 def get_transactions_between_dates(start_date: str, end_date: str, account_id: str):
     """
-    Get all transactions between two dates for a specific account.
+    Get individual amounts, category, transaction type, and bank name
+    for transactions between two dates for a specific account.
 
     Args:
         start_date (str): Start date in YYYY-MM-DD format.
@@ -95,10 +143,15 @@ def get_transactions_between_dates(start_date: str, end_date: str, account_id: s
         account_id (str): The unique identifier of the account.
 
     Returns:
-        List[Dict]: A list of transaction records between the specified dates.
+        List[Dict]: A list of transaction records with the amount, category,
+                    transaction_type and bank_name between the specified dates.
     """
     query = f"""
-        SELECT *
+        SELECT 
+            amount,
+            category,
+            transaction_type,
+            bank_name
         FROM new_table
         WHERE "date" BETWEEN '{start_date}' AND '{end_date} 23:59:59'
           AND account_id = '{account_id}';
@@ -108,7 +161,11 @@ def get_transactions_between_dates(start_date: str, end_date: str, account_id: s
 
 def get_transactions_last_month(account_id: str):
     """
-    Get the sum of all transactions from the previous calendar month.
+    Get summary of transactions from the previous calendar month including:
+      - Total transaction amount
+      - Total received (credits)
+      - Total spent (debits)
+      - Category with the highest spending and its amount
 
     Uses PostgreSQL date functions to filter transactions between
     the first and last day of the previous month.
@@ -117,14 +174,31 @@ def get_transactions_last_month(account_id: str):
         account_id (str): The unique identifier of the account.
 
     Returns:
-        Dict: A dictionary containing the sum of transactions from the previous month.
+        Dict: A dictionary containing the aggregated values for transactions.
     """
     query = f"""
-        SELECT COALESCE(SUM(amount), 0) as total_transactions_last_month
-        FROM new_table
-        WHERE "date" >= date_trunc('month', current_date - interval '1 month')
-          AND "date" < date_trunc('month', current_date)
-          AND account_id = '{account_id}';
+        WITH last_month AS (
+            SELECT *
+            FROM new_table
+            WHERE "date" >= date_trunc('month', current_date - interval '1 month')
+              AND "date" < date_trunc('month', current_date)
+              AND account_id = '{account_id}'
+        ),
+        highest_spent_category AS (
+            SELECT category, SUM(amount) AS total_spent
+            FROM last_month
+            WHERE transaction_type ILIKE '%debit%'
+            GROUP BY category
+            ORDER BY total_spent DESC
+            LIMIT 1
+        )
+        SELECT 
+            COALESCE(SUM(amount), 0) AS total_transactions_last_month,
+            COALESCE(SUM(CASE WHEN transaction_type ILIKE '%credit%' THEN amount ELSE 0 END), 0) AS total_received,
+            COALESCE(SUM(CASE WHEN transaction_type ILIKE '%debit%' THEN amount ELSE 0 END), 0) AS total_spent,
+            (SELECT category FROM highest_spent_category) AS highest_spent_category,
+            (SELECT total_spent FROM highest_spent_category) AS highest_spent_amount
+        FROM last_month;
     """
     return execute_sql(query)
 
@@ -134,17 +208,22 @@ def get_transactions_last_month(account_id: str):
 
 def get_transactions_over(amount: float, account_id: str):
     """
-    Get all transactions with amount greater than specified value.
+    Get the individual amounts, category, transaction type, and bank name for transactions
+    with an amount greater than the specified value.
 
     Args:
         amount (float): The minimum amount threshold.
         account_id (str): The unique identifier of the account.
 
     Returns:
-        List[Dict]: A list of transaction records exceeding the specified amount.
+        List[Dict]: A list of transaction records with the specified columns.
     """
     query = f"""
-        SELECT *
+        SELECT 
+            amount,
+            category,
+            transaction_type,
+            bank_name
         FROM new_table
         WHERE amount > {amount}
           AND account_id = '{account_id}';
@@ -153,31 +232,18 @@ def get_transactions_over(amount: float, account_id: str):
 
 
 def get_transactions_below(amount: float, account_id: str):
-    """List all transactions below a specified amount for the given account."""
+    """
+    List individual transaction amounts, category, transaction type, and bank name for transactions \
+    below a specified amount for the given account.
+    """
     query = f"""
-        SELECT *
+        SELECT 
+            amount,
+            category,
+            transaction_type,
+            bank_name
         FROM new_table
         WHERE amount < {amount}
-          AND account_id = '{account_id}';
-    """
-    return execute_sql(query)
-
-
-def get_transactions_by_exact_amount(amount: float, account_id: str):
-    """
-    Get all transactions matching an exact amount value.
-
-    Args:
-        amount (float): The exact amount to match (precise to 2 decimal places).
-        account_id (str): The unique identifier of the account.
-
-    Returns:
-        List[Dict]: A list of transaction records matching the exact amount.
-    """
-    query = f"""
-        SELECT *
-        FROM new_table
-        WHERE amount = {amount:.2f}
           AND account_id = '{account_id}';
     """
     return execute_sql(query)

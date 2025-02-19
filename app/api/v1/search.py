@@ -1,6 +1,3 @@
-# app/routes.py
-
-import re
 from fastapi import APIRouter, HTTPException
 
 from app.functions.function_caller import openai_function_call

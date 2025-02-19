@@ -1,5 +1,3 @@
-# app/ai_function_caller.py
-
 import inspect
 import json
 from pprint import pprint
@@ -13,7 +11,7 @@ from app.database import sql_queries
 
 # Mapping from function names to actual functions
 FUNCTION_MAP: Dict[str, Callable] = {
-    "get_last_5_transactions": sql_queries.get_last_5_transactions,
+    "get_recent_transactions": sql_queries.get_recent_transactions,
     "get_current_balance": sql_queries.get_current_balance,
     "get_all_transactions": sql_queries.get_all_transactions,
     "get_transactions_by_date": sql_queries.get_transactions_by_date,
@@ -21,7 +19,6 @@ FUNCTION_MAP: Dict[str, Callable] = {
     "get_transactions_last_month": sql_queries.get_transactions_last_month,
     "get_transactions_over": sql_queries.get_transactions_over,
     "get_transactions_below": sql_queries.get_transactions_below,
-    "get_transactions_by_exact_amount": sql_queries.get_transactions_by_exact_amount,
     "get_deposits": sql_queries.get_deposits,
     "get_withdrawals": sql_queries.get_withdrawals,
     "get_transactions_by_category": sql_queries.get_transactions_by_category,
@@ -137,7 +134,8 @@ def generate_nl_response(function_result: dict) -> str:
     # Create a prompt that includes the raw result.
     prompt = (
         "You are a helpful financial assistant. Based on the following financial data, "
-        "provide a concise 2-3 sentence summary addressing the user as 'you'. Focus on key insights and avoid overly technical language.\n\n"
+        "provide a concise 2-3 sentence summary addressing the user as 'you'.\
+        Focus on key insights and avoid overly technical language.\n\n"
         "The default currency is in Naira.\n"
         "Financial Data:\n"
         "--------------------------------------------------\n"
@@ -179,7 +177,8 @@ def openai_function_call(user_query: str, account_id: str) -> Dict[str, Any]:
         {"role": "user", "content": user_query},
         {
             "role": "system",
-            "content": "You are a helpful financial assistant. When given a keyword, fetch and summarize credit, debit, and total amounts for transactions matching that keyword",
+            "content": "You are a helpful financial assistant. When given a keyword, fetch and summarize credit, debit,\
+            and total amounts for transactions matching that keyword, Auto fix user query with gramma errors",
         },
     ]
 
