@@ -1,140 +1,528 @@
-from datetime import datetime, timezone
-from unittest.mock import patch
+import decimal
+from os import getenv
 
-import pytest
+from dotenv import load_dotenv
 
-# Mock Data Setup
-TEST_ACCOUNT_ID = "550e8400-e29b-41d4-a716-446655440000"
+from app.database.execute_sql import execute_sql
+from app.database.sql_queries import (
+    get_all_transactions,
+    get_current_balance,
+    get_deposits,
+    get_recent_transactions,
+    get_transactions_below,
+    get_transactions_between_amounts_and_category,
+    get_transactions_between_dates,
+    get_transactions_by_bank_and_category,
+    get_transactions_by_bank_name,
+    get_transactions_by_category,
+    get_transactions_by_date,
+    get_transactions_created_last_week,
+    get_transactions_last_month,
+    get_transactions_over,
+    get_transactions_updated_since,
+    get_withdrawals,
+    get_withdrawals_over_last_days,
+)
 
-MOCK_TRANSACTIONS = [
-    {
-        "id": "123e4567-e89b-12d3-a456-426614174001",
-        "transaction_id": "a23e4567-e89b-12d3-a456-426614174001",
-        "amount": 50000.00,
-        "date": datetime(2024, 2, 19, 10, 30, tzinfo=timezone.utc),
-        "narration": "SALARY PAYMENT - FEB 2024",
-        "transaction_type": "credit",
-        "balance_after": 150000.00,
-        "category": "salary",
-        "created_at": datetime(2024, 2, 19, 10, 30, tzinfo=timezone.utc),
-        "updated_at": datetime(2024, 2, 19, 10, 30, tzinfo=timezone.utc),
-        "account_id": TEST_ACCOUNT_ID,
-        "mono_connection_id": "m23e4567-e89b-12d3-a456-426614174001",
-        "currency": "NGN",
-        "first_name": "John",
-        "last_name": "Doe",
-        "account_number": "0123456789",
-        "bank_name": "First Bank",
-    },
-    {
-        "id": "123e4567-e89b-12d3-a456-426614174002",
-        "transaction_id": "b23e4567-e89b-12d3-a456-426614174002",
-        "amount": -15000.00,
-        "date": datetime(2024, 2, 18, 15, 45, tzinfo=timezone.utc),
-        "narration": "SHOPPING - MALL PURCHASE",
-        "transaction_type": "debit",
-        "balance_after": 100000.00,
-        "category": "shopping",
-        "created_at": datetime(2024, 2, 18, 15, 45, tzinfo=timezone.utc),
-        "updated_at": datetime(2024, 2, 18, 15, 45, tzinfo=timezone.utc),
-        "account_id": TEST_ACCOUNT_ID,
-        "mono_connection_id": "m23e4567-e89b-12d3-a456-426614174002",
-        "currency": "NGN",
-        "first_name": "John",
-        "last_name": "Doe",
-        "account_number": "0123456789",
-        "bank_name": "First Bank",
-    },
-    {
-        "id": "123e4567-e89b-12d3-a456-426614174003",
-        "transaction_id": "c23e4567-e89b-12d3-a456-426614174003",
-        "amount": -5000.00,
-        "date": datetime(2024, 2, 17, 9, 20, tzinfo=timezone.utc),
-        "narration": "UTILITY BILL PAYMENT",
-        "transaction_type": "debit",
-        "balance_after": 115000.00,
-        "category": "utilities",
-        "created_at": datetime(2024, 2, 17, 9, 20, tzinfo=timezone.utc),
-        "updated_at": datetime(2024, 2, 17, 9, 20, tzinfo=timezone.utc),
-        "account_id": TEST_ACCOUNT_ID,
-        "mono_connection_id": "m23e4567-e89b-12d3-a456-426614174003",
-        "currency": "NGN",
-        "first_name": "John",
-        "last_name": "Doe",
-        "account_number": "0123456789",
-        "bank_name": "UBA",
-    },
-    {
-        "id": "123e4567-e89b-12d3-a456-426614174004",
-        "transaction_id": "d23e4567-e89b-12d3-a456-426614174004",
-        "amount": 25000.00,
-        "date": datetime(2024, 2, 16, 14, 15, tzinfo=timezone.utc),
-        "narration": "TRANSFER FROM JAMES",
-        "transaction_type": "credit",
-        "balance_after": 120000.00,
-        "category": "transfer",
-        "created_at": datetime(2024, 2, 16, 14, 15, tzinfo=timezone.utc),
-        "updated_at": datetime(2024, 2, 16, 14, 15, tzinfo=timezone.utc),
-        "account_id": TEST_ACCOUNT_ID,
-        "mono_connection_id": "m23e4567-e89b-12d3-a456-426614174004",
-        "currency": "NGN",
-        "first_name": "John",
-        "last_name": "Doe",
-        "account_number": "0123456789",
-        "bank_name": "GTBank",
-    },
-    {
-        "id": "123e4567-e89b-12d3-a456-426614174005",
-        "transaction_id": "e23e4567-e89b-12d3-a456-426614174005",
-        "amount": -10000.00,
-        "date": datetime(2024, 2, 15, 20, 30, tzinfo=timezone.utc),
-        "narration": "RESTAURANT PAYMENT",
-        "transaction_type": "debit",
-        "balance_after": 95000.00,
-        "category": "entertainment",
-        "created_at": datetime(2024, 2, 15, 20, 30, tzinfo=timezone.utc),
-        "updated_at": datetime(2024, 2, 15, 20, 30, tzinfo=timezone.utc),
-        "account_id": TEST_ACCOUNT_ID,
-        "mono_connection_id": "m23e4567-e89b-12d3-a456-426614174005",
-        "currency": "NGN",
-        "first_name": "John",
-        "last_name": "Doe",
-        "account_number": "0123456789",
-        "bank_name": "UBA",
-    },
-]
+load_dotenv()
+
+ID = getenv("TEST_ID")
 
 
-@pytest.fixture
-def mock_db():
-    """Fixture to mock the database execution"""
-    with patch("app.database.sql_queries.execute_sql") as mock:
-        mock.return_value = MOCK_TRANSACTIONS
-        yield mock
+def test_execute_sql():
+    result = execute_sql(
+        "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'new_table')"
+    )
+    assert result[0]["exists"] is True
 
 
-def test_get_recent_transactions(mock_db):
-    """Test getting 3 most recent transactions"""
-    from app.database.sql_queries import get_recent_transactions
+def test_get_recent_transactions():
+    result = get_recent_transactions(ID)
 
-    # Call the function with test account ID
-    result = get_recent_transactions(TEST_ACCOUNT_ID)
+    # Basic assertions
+    assert isinstance(result, list)  # Should return a list
+    assert len(result) <= 3  # Should return max 3 transactions
 
-    # Verify mock_db was called with correct query
-    mock_db.assert_called_once()
-    query_call = mock_db.call_args[0][0]
-    assert "SELECT" in query_call
-    assert 'ORDER BY "date" DESC' in query_call
-    assert "LIMIT 3" in query_call
-    assert TEST_ACCOUNT_ID in query_call
+    # If there are results, verify the structure
+    if result:
+        transaction = result[0]
+        assert "amount" in transaction
+        assert "transaction_type" in transaction
+        assert "category" in transaction
+        assert "bank_name" in transaction
+        assert "balance_after" in transaction
+        assert "total_amount_of_3_transactions" in transaction
 
-    # Verify the returned data matches expectations
-    assert len(result) == len(MOCK_TRANSACTIONS)  # Will be 5 due to mock setup
 
-    # Verify the structure of returned data
-    first_transaction = result[0]
-    assert "amount" in first_transaction
-    assert "transaction_type" in first_transaction
-    assert "category" in first_transaction
-    assert "bank_name" in first_transaction
-    assert "balance_after" in first_transaction
+def test_get_current_balance():
+    # Execute the function with test ID
+    result = get_current_balance(ID)
+
+    # Basic assertions
+    assert isinstance(result, list)  # Should return a list
+
+    balance_info = result[0]
+    assert "balance_after" in balance_info
+    assert isinstance(balance_info["balance_after"], (int, float, decimal.Decimal))
+
+
+def test_get_all_transactions():
+    result = get_all_transactions(ID)
+
+    assert isinstance(result, list)
+
+    transaction_summary = result[0]
+    expected_fields = [
+        "total_amount",
+        "total_credit",
+        "total_debit",
+        "highest_credit_category",
+        "highest_credit_amount",
+        "highest_debit_category",
+        "highest_debit_amount",
+    ]
+    for field in expected_fields:
+        assert field in transaction_summary
+
+    numeric_fields = [
+        "total_amount",
+        "total_credit",
+        "total_debit",
+        "highest_credit_amount",
+        "highest_debit_amount",
+    ]
+    for field in numeric_fields:
+        if transaction_summary[field] is not None:
+            assert isinstance(transaction_summary[field], (int, float, decimal.Decimal))
+
+
+def test_get_transactions_by_date():
+    date = "2024-01-20"
+    result = get_transactions_by_date(date, ID)
+
+    assert isinstance(result, list)
+
+    transaction = result[0]
+    expected_fields = ["amount", "category", "transaction_type", "bank_name"]
+    for field in expected_fields:
+        assert field in transaction
+
+    assert isinstance(transaction["amount"], (int, float, decimal.Decimal))
+    assert isinstance(transaction["category"], str)
+    assert isinstance(transaction["transaction_type"], str)
+    assert isinstance(transaction["bank_name"], str)
+
+
+def test_get_transactions_between_dates():
+    start_date = "2024-01-10"
+    end_date = "2024-01-20"
+    result = get_transactions_between_dates(start_date, end_date, ID)
+
+    assert isinstance(result, list)
+
+    transaction = result[0]
+    expected_fields = [
+        "amount",
+        "category",
+        "transaction_type",
+        "bank_name",
+    ]
+    for field in expected_fields:
+        assert field in transaction
+
+    # Verify data types
+    assert isinstance(transaction["amount"], (int, float, decimal.Decimal))
+    assert isinstance(transaction["category"], str)
+    assert isinstance(transaction["transaction_type"], str)
+    assert isinstance(transaction["bank_name"], str)
+
+
+def test_get_transactions_last_month():
+    # Execute function with test ID
+    result = get_transactions_last_month(ID)
+
+    # Basic assertions
+    assert isinstance(result, list)
+
+    monthly_summary = result[0]
+    expected_fields = [
+        "total_transactions_last_month",
+        "total_received",
+        "total_spent",
+        "highest_spent_category",
+        "highest_spent_amount",
+    ]
+    for field in expected_fields:
+        assert field in monthly_summary
+
+    # Verify numeric fields have correct type
+    numeric_fields = [
+        "total_transactions_last_month",
+        "total_received",
+        "total_spent",
+        "highest_spent_amount",
+    ]
+    for field in numeric_fields:
+        if monthly_summary[field] is not None:
+            assert isinstance(monthly_summary[field], (int, float, decimal.Decimal))
+
+        # Verify category field is string if present
+    if monthly_summary["highest_spent_category"]:
+        assert isinstance(monthly_summary["highest_spent_category"], str)
+
+
+def test_get_transactions_over():
+    # Test with a threshold amount
+    threshold = 1000.00
+    result = get_transactions_over(threshold, ID)
+
+    # Basic assertions
+    assert isinstance(result, list)
+
+    transaction = result[0]
+    expected_fields = ["amount", "category", "transaction_type", "bank_name"]
+    for field in expected_fields:
+        assert field in transaction
+
+    # Verify amount is above threshold
+    assert float(transaction["amount"]) > threshold
+
+    # Verify data types
+    assert isinstance(transaction["amount"], (int, float, decimal.Decimal))
+    assert isinstance(transaction["category"], str)
+    assert isinstance(transaction["transaction_type"], str)
+    assert isinstance(transaction["bank_name"], str)
+
+
+def test_get_transactions_below():
+    # Test with a threshold amount
+    threshold = 5000.00
+    result = get_transactions_below(threshold, ID)
+
+    # Basic assertions
+    assert isinstance(result, list)
+
+    transaction = result[0]
+    expected_fields = ["amount", "category", "transaction_type", "bank_name"]
+    for field in expected_fields:
+        assert field in transaction
+
+    # Verify amount is below threshold
+    assert float(transaction["amount"]) < threshold
+
+    # Verify data types
+    assert isinstance(transaction["amount"], (int, float, decimal.Decimal))
+    assert isinstance(transaction["category"], str)
+    assert isinstance(transaction["transaction_type"], str)
+    assert isinstance(transaction["bank_name"], str)
+
+
+def test_get_deposits():
+    # Execute function with test ID
+    result = get_deposits(ID)
+
+    # Basic assertions
+    assert isinstance(result, list)
+
+    deposit_summary = result[0]
+    expected_fields = [
+        "total_deposits",
+        "highest_deposit_category",
+        "highest_category_amount",
+    ]
+    for field in expected_fields:
+        assert field in deposit_summary
+
+    # Verify numeric fields have correct type
+    numeric_fields = ["total_deposits", "highest_category_amount"]
+    for field in numeric_fields:
+        if deposit_summary[field] is not None:
+            assert isinstance(deposit_summary[field], (int, float, decimal.Decimal))
+
+    # Verify category field is string if present
+    if deposit_summary["highest_deposit_category"]:
+        assert isinstance(deposit_summary["highest_deposit_category"], str)
+
+
+def test_get_withdrawals():
+    # Execute function with test ID
+    result = get_withdrawals(ID)
+
+    # Basic assertions
+    assert isinstance(result, list)
+
+    withdrawal_summary = result[0]
+    expected_fields = [
+        "total_withdrawals",
+        "highest_withdrawal_category",
+        "highest_category_amount",
+    ]
+    for field in expected_fields:
+        assert field in withdrawal_summary
+
+    # Verify numeric fields have correct type
+    numeric_fields = ["total_withdrawals", "highest_category_amount"]
+    for field in numeric_fields:
+        if withdrawal_summary[field] is not None:
+            assert isinstance(withdrawal_summary[field], (int, float, decimal.Decimal))
+
+    # Verify category field is string if present
+    if withdrawal_summary["highest_withdrawal_category"]:
+        assert isinstance(withdrawal_summary["highest_withdrawal_category"], str)
+
+
+def test_get_transactions_by_category():
+    # Test with a sample category
+    category = "transfer"
+    result = get_transactions_by_category(category, ID)
+
+    # Basic assertions
+    assert isinstance(result, list)
+
+    transaction_summary = result[0]
+    expected_fields = ["credit_amount", "debit_amount", "total_amount"]
+
+    # Check all expected fields are present
+    for field in expected_fields:
+        assert field in transaction_summary
+
+    # Verify numeric fields have correct type
+    for field in expected_fields:
+        if transaction_summary[field] is not None:
+            assert isinstance(transaction_summary[field], (int, float, decimal.Decimal))
+
+    # Verify total_amount equals credit_amount minus debit_amount
+    if all(transaction_summary[field] is not None for field in expected_fields):
+        expected_total = (
+            transaction_summary["credit_amount"] + transaction_summary["debit_amount"]
+        )
+        assert (
+            abs(transaction_summary["total_amount"] - expected_total) < 0.01
+        )  # Allow for small rounding differences
+
+
+def test_get_transactions_by_bank_name():
+    # Test with a sample bank name
+    bank_name = "GTBank"
+    result = get_transactions_by_bank_name(bank_name, ID)
+
+    # Basic assertions
+    assert isinstance(result, list)
+
+    transaction_summary = result[0]
+    expected_fields = ["credit_amount", "debit_amount", "total_amount"]
+
+    # Check all expected fields are present
+    for field in expected_fields:
+        assert field in transaction_summary
+
+    # Verify numeric fields have correct type
+    for field in expected_fields:
+        if transaction_summary[field] is not None:
+            assert isinstance(transaction_summary[field], (int, float, decimal.Decimal))
+
+    # Verify total amount matches credit minus debit
+    if all(transaction_summary[field] is not None for field in expected_fields):
+        expected_total = (
+            transaction_summary["credit_amount"] + transaction_summary["debit_amount"]
+        )
+        assert abs(transaction_summary["total_amount"] - expected_total) < 0.01
+
+
+def test_get_transactions_created_last_week():
+    # Execute function with test ID
+    result = get_transactions_created_last_week(ID)
+
+    # Basic assertions
+    assert isinstance(result, list)
+
+    if result:
+        weekly_summary = result[0]
+        expected_fields = [
+            "total_sum",
+            "total_spent",
+            "total_received",
+            "highest_spend_category",
+            "highest_spend_amount",
+        ]
+
+        # Check all expected fields are present
+        for field in expected_fields:
+            assert field in weekly_summary
+
+        # Verify numeric fields have correct type
+        numeric_fields = [
+            "total_sum",
+            "total_spent",
+            "total_received",
+            "highest_spend_amount",
+        ]
+        for field in numeric_fields:
+            if weekly_summary[field] is not None:
+                assert isinstance(weekly_summary[field], (int, float, decimal.Decimal))
+
+            # Verify category field is string if present
+        if weekly_summary["highest_spend_category"]:
+            assert isinstance(weekly_summary["highest_spend_category"], str)
+
+        # Verify total sum equals received minus spent
+        if all(
+            field in weekly_summary
+            for field in ["total_sum", "total_received", "total_spent"]
+        ):
+            expected_total = (
+                weekly_summary["total_received"] + weekly_summary["total_spent"]
+            )
+            assert abs(weekly_summary["total_sum"] - expected_total) < 0.01
+
+
+def test_get_withdrawals_over_last_days():
+    # Test parameters
+    min_amount = 100000.00
+    days = 50
+
+    # Execute function with test parameters
+    result = get_withdrawals_over_last_days(min_amount, ID, days)
+
+    # Basic assertions
+    assert isinstance(result, list)
+
+    withdrawal_summary = result[0]
+    expected_fields = [
+        "total_sum",
+        "total_spent",
+        "total_received",
+        "highest_spend_category",
+        "highest_category_amount",
+    ]
+
+    # Check all expected fields are present
+    for field in expected_fields:
+        assert field in withdrawal_summary
+
+    # Verify numeric fields have correct type
+    numeric_fields = [
+        "total_sum",
+        "total_spent",
+        "total_received",
+        "highest_category_amount",
+    ]
+    for field in numeric_fields:
+        if withdrawal_summary[field] is not None:
+            assert isinstance(withdrawal_summary[field], (int, float, decimal.Decimal))
+
+    # Verify category field is string if present
+    if withdrawal_summary["highest_spend_category"]:
+        assert isinstance(withdrawal_summary["highest_spend_category"], str)
+
+    # Verify total sum equals received minus spent
+    if all(
+        withdrawal_summary[field] is not None
+        for field in ["total_sum", "total_received", "total_spent"]
+    ):
+        expected_total = (
+            withdrawal_summary["total_received"] + withdrawal_summary["total_spent"]
+        )
+        assert abs(withdrawal_summary["total_sum"] - expected_total) < 0.01
+
+
+def test_get_transactions_updated_since():
+    # Test parameters
+    specific_date = "2024-02-01 00:00:00"
+    result = get_transactions_updated_since(specific_date, ID)
+
+    # Basic assertions
+    assert isinstance(result, list)
+
+    transaction_summary = result[0]
+    expected_fields = [
+        "total_sum",
+        "total_spent",
+        "total_received",
+        "highest_spend_category",
+        "highest_spend_amount",
+    ]
+
+    # Check all expected fields are present
+    for field in expected_fields:
+        assert field in transaction_summary
+
+    # Verify numeric fields
+    numeric_fields = [
+        "total_sum",
+        "total_spent",
+        "total_received",
+        "highest_spend_amount",
+    ]
+    for field in numeric_fields:
+        if transaction_summary[field] is not None:
+            assert isinstance(transaction_summary[field], (int, float, decimal.Decimal))
+
+    # Verify category field is string if present
+    if transaction_summary["highest_spend_category"]:
+        assert isinstance(transaction_summary["highest_spend_category"], str)
+
+
+def test_get_transactions_between_amounts_and_category():
+    # Test parameters
+    min_amount = 100000.00
+    max_amount = 1000000.00
+    category = "transfer"
+
+    result = get_transactions_between_amounts_and_category(
+        min_amount, max_amount, category, ID
+    )
+
+    # Basic assertions
+    assert isinstance(result, list)
+
+    transaction_summary = result[0]
+    expected_fields = [
+        "total_sum",
+        "total_spent",
+        "total_received",
+        "highest_spend_category",
+        "highest_category_amount",
+    ]
+
+    # Check all expected fields are present
+    for field in expected_fields:
+        assert field in transaction_summary
+
+    # Verify numeric fields
+    numeric_fields = [
+        "total_sum",
+        "total_spent",
+        "total_received",
+        "highest_category_amount",
+    ]
+    for field in numeric_fields:
+        if transaction_summary[field] is not None:
+            assert isinstance(transaction_summary[field], (int, float, decimal.Decimal))
+
+    # Verify category field is string if present
+    if transaction_summary["highest_spend_category"]:
+        assert isinstance(transaction_summary["highest_spend_category"], str)
+
+
+def test_get_transactions_by_bank_and_category():
+    # Test parameters
+    bank_name = "GTBank"
+    category = "transfer"
+
+    result = get_transactions_by_bank_and_category(bank_name, category, ID)
+
+    # Basic assertions
+    assert isinstance(result, list)
+
+    transaction_summary = result[0]
+    expected_fields = ["total_sum", "total_spent", "total_received"]
+
+    # Check all expected fields are present
+    for field in expected_fields:
+        assert field in transaction_summary
+
+    # Verify all fields are numeric
+    for field in expected_fields:
+        if transaction_summary[field] is not None:
+            assert isinstance(transaction_summary[field], (int, float, decimal.Decimal))

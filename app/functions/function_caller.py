@@ -22,11 +22,9 @@ FUNCTION_MAP: Dict[str, Callable] = {
     "get_deposits": sql_queries.get_deposits,
     "get_withdrawals": sql_queries.get_withdrawals,
     "get_transactions_by_category": sql_queries.get_transactions_by_category,
-    "get_transactions_by_narration_keyword": sql_queries.get_transactions_by_narration_keyword,
     "get_transactions_by_account_number": sql_queries.get_transactions_by_account_number,
     "get_transactions_by_bank_name": sql_queries.get_transactions_by_bank_name,
     "get_transactions_by_account_id": sql_queries.get_transactions_by_account_id,
-    "get_transactions_by_mono_connection_id": sql_queries.get_transactions_by_mono_connection_id,
     "get_transactions_by_currency": sql_queries.get_transactions_by_currency,
     "get_withdrawals_over_last_days": sql_queries.get_withdrawals_over_last_days,
     "get_transactions_by_bank_and_category": sql_queries.get_transactions_by_bank_and_category,
@@ -133,10 +131,9 @@ def generate_nl_response(function_result: dict) -> str:
     """
     # Create a prompt that includes the raw result.
     prompt = (
-        "You are a helpful financial assistant. Based on the following financial data, "
-        "provide a concise 2-3 sentence summary addressing the user as 'you'.\
+        "You are a Financial Insight Analyst. Given the following financial data,"
+        "provide a concise 2-3 sentence summary, addressing the user as 'you'.\
         Focus on key insights and avoid overly technical language.\n\n"
-        "The default currency is in Naira.\n"
         "Financial Data:\n"
         "--------------------------------------------------\n"
         f"{function_result}\n"
@@ -147,7 +144,7 @@ def generate_nl_response(function_result: dict) -> str:
     response = client.chat.completions.create(
         model="gpt-4",
         messages=[
-            {"role": "system", "content": "You are a helpful financial assistant."},
+            {"role": "system", "content": "You are a Financial Insight Analyst."},
             {"role": "user", "content": prompt},
         ],
     )
@@ -177,8 +174,8 @@ def openai_function_call(user_query: str, account_id: str) -> Dict[str, Any]:
         {"role": "user", "content": user_query},
         {
             "role": "system",
-            "content": "You are a helpful financial assistant. When given a keyword, fetch and summarize credit, debit,\
-            and total amounts for transactions matching that keyword, Auto fix user query with gramma errors",
+            "content": "You are a financial assistant. Given a keyword, call 'get_transactions_by_keyword'\
+            to fetch relevant transactions. Automatically correct grammar in user queries.",
         },
     ]
 
