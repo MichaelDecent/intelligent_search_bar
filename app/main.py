@@ -6,7 +6,7 @@ from app import config
 
 
 def get_application():
-    app = FastAPI(title=config.PROJECT_NAME, version=config.VERSION)
+    app = FastAPI(title=config.PROJECT_NAME, version=config.VERSION, description=config.DESCRIPTION)
 
     app.add_middleware(
         CORSMiddleware,
