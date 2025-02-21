@@ -1,7 +1,5 @@
 from app.database.execute_sql import execute_sql
 
-# 1. Recent Activity & Balance
-
 
 def get_recent_transactions(account_id: str):
     """
@@ -120,9 +118,6 @@ def get_all_transactions(account_id: str):
     return execute_sql(query)
 
 
-# 2. Date-Specific Queries
-
-
 def get_transactions_by_date(date_str: str, account_id: str):
     """
     Get all transactions for a specific date and account, retrieving individual amounts, currency,
@@ -237,9 +232,6 @@ def get_transactions_last_month(account_id: str):
     return execute_sql(query)
 
 
-# 3. Amount-Based Filters
-
-
 def get_transactions_over(amount: float, account_id: str):
     """
     Get the individual amounts, currency, category, transaction type, and bank name for transactions
@@ -283,9 +275,6 @@ def get_transactions_below(amount: float, account_id: str):
           AND account_id = '{account_id}';
     """
     return execute_sql(query)
-
-
-# 4. Transaction Type & Category
 
 
 def get_deposits(account_id: str):
@@ -389,9 +378,6 @@ def get_transactions_by_category(category: str, account_id: str):
     return execute_sql(query)
 
 
-# 6. Account & Bank Specific Queries
-
-
 def get_transactions_by_account_number(account_number: str, account_id: str):
     """
     Get credit amount, debit amount and total sum for transactions from a specific account number.
@@ -469,9 +455,6 @@ def get_transactions_by_account_id(account_id: str):
         LIMIT 1;
     """
     return execute_sql(query)
-
-
-# 7. Currency-Based Queries
 
 
 def get_transactions_by_currency(currency: str, account_id: str):
@@ -651,9 +634,6 @@ def get_transactions_between_amounts_and_category(
         FROM totals;
     """
     return execute_sql(query)
-
-
-# 10. Historical & Audit Queries
 
 
 def get_transactions_updated_since(specific_date: str, account_id: str):

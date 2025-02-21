@@ -9,7 +9,6 @@ from pydantic import create_model
 from app.config import OPENAI_API_KEY
 from app.database import sql_queries
 
-# Mapping from function names to actual functions
 FUNCTION_MAP: Dict[str, Callable] = {
     "get_recent_transactions": sql_queries.get_recent_transactions,
     "get_current_balance": sql_queries.get_current_balance,
@@ -46,18 +45,14 @@ def generate_function_schema(func: Callable) -> Dict[str, Any]:
     fields = {}
     required = []
 
-    # Iterate over function parameters.
     for name, param in sig.parameters.items():
-        # Only include parameters that are not 'self' (if any) or context-specific.
         if name == "self":
             continue
 
-        # Determine type annotation; default to string if not provided.
         annotation = (
             param.annotation if param.annotation is not inspect.Parameter.empty else str
         )
 
-        # Mark the field as required if there is no default.
         if param.default is inspect.Parameter.empty:
             default = ...
             required.append(name)
@@ -66,12 +61,9 @@ def generate_function_schema(func: Callable) -> Dict[str, Any]:
 
         fields[name] = (annotation, default)
 
-    # Create a temporary Pydantic model to generate a JSON schema.
     Model = create_model(func.__name__ + "Parameters", **fields)  # type: ignore
     schema = Model.model_json_schema()
 
-    # The JSON Schema for function parameters should be under the 'properties' key.
-    # OpenAI expects the schema to be an object type.
     return {
         "type": "object",
         "properties": schema.get("properties", {}),
@@ -107,10 +99,8 @@ def call_function_by_name(function_name: str, arguments: Dict[str, Any]) -> Any:
     if function_name not in FUNCTION_MAP:
         raise ValueError(f"Function {function_name} is not defined in the mapping.")
 
-    # Retrieve the function
     func = FUNCTION_MAP[function_name]
 
-    # Call the function using unpacked arguments
     try:
         result = func(**arguments)
     except Exception as e:
@@ -129,7 +119,6 @@ def generate_nl_response(function_result: dict) -> str:
     Returns:
         str: A natural language summary of the data.
     """
-    # Create a prompt that includes the raw result.
     prompt = (
         "You are a Financial Insight Analyst. Given the following financial data,"
         "provide a concise 2-3 sentence summary, addressing the user as 'you'.\
@@ -166,10 +155,8 @@ def openai_function_call(user_query: str, account_id: str) -> Dict[str, Any]:
     Returns:
         Dict[str, Any]: Dictionary containing the function call results or direct response
     """
-    # Convert our functions list to OpenAI's new tools format
     tools = generate_functions_list()
 
-    # Create messages list
     messages = [
         {"role": "user", "content": user_query},
         {
@@ -179,25 +166,20 @@ def openai_function_call(user_query: str, account_id: str) -> Dict[str, Any]:
         },
     ]
 
-    # Make API call with new format
     try:
         response = client.chat.completions.create(
             model="gpt-4", messages=messages, tools=tools, tool_choice="auto"
         )
 
-        # Get the message from the response
         message = response.choices[0].message
 
-        # Check if the model wanted to call a function
         if message.tool_calls:
             tool_call = message.tool_calls[0]  # Get first tool call
             function_name = tool_call.function.name
             arguments = json.loads(tool_call.function.arguments)
 
-            # Attach the user's account_id automatically.
             arguments["account_id"] = account_id
 
-            # Call the function with the provided arguments
             result = call_function_by_name(function_name, arguments)
 
             pprint(
@@ -208,12 +190,10 @@ def openai_function_call(user_query: str, account_id: str) -> Dict[str, Any]:
                 }
             )
 
-            # Generate a natural language response based on the function result
             nl_response = generate_nl_response(result)
 
             return {"nl_response": nl_response}
         else:
-            # If no function call was suggested, return the natural language response
             return {"nl_response": message.content}
 
     except Exception as e:
