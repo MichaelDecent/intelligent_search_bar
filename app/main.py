@@ -10,7 +10,7 @@ def get_application():
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=config.ALLOWED_HOSTS,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

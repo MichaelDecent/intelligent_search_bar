@@ -10,6 +10,10 @@ PROJECT_NAME = "MoniMoore AI-Powered Intelligent Search Engine"
 VERSION = "1.0.0"
 DESCRIPTION = "API for handling user queries and returning financial insights."
 
+API_PREFIX = "/api/v1"
+
+ALLOWED_HOSTS = getenv("ALLOWED_HOSTS").split(",")
+
 
 # Database Configuration
 DB_CONFIG = {
