@@ -480,9 +480,6 @@ def get_transactions_by_currency(currency: str, account_id: str):
     return execute_sql(query)
 
 
-# 9. Composite Filters
-
-
 def get_withdrawals_over_last_days(amount: float, account_id: str, days: int = 30):
     """
     Get summary of withdrawals over a specified amount within a time period.
@@ -493,7 +490,7 @@ def get_withdrawals_over_last_days(amount: float, account_id: str, days: int = 3
         days (int, optional): Number of past days to look back. Defaults to 30.
 
     Returns:
-        Dict: Contains total sum, amount spent, amount received,\ 
+        Dict: Contains total sum, amount spent, amount received,\
         and highest spending category with amount and currencies.
     """
     query = f"""
