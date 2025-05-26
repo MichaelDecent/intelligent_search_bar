@@ -1,6 +1,6 @@
 import inspect
 import json
-from pprint import pprint
+import logging
 from typing import Any, Callable, Dict
 
 from openai import OpenAI
@@ -34,6 +34,7 @@ FUNCTION_MAP: Dict[str, Callable] = {
 }
 
 client = OpenAI(api_key=OPENAI_API_KEY)
+logger = logging.getLogger(__name__)
 
 
 def generate_function_schema(func: Callable) -> Dict[str, Any]:
@@ -139,7 +140,7 @@ def generate_nl_response(function_result: dict) -> str:
     )
 
     nl_response = response.choices[0].message.content
-    print(nl_response)
+    logger.info(nl_response)
     return nl_response
 
 
@@ -182,7 +183,7 @@ def openai_function_call(user_query: str, account_id: str) -> Dict[str, Any]:
 
             result = call_function_by_name(function_name, arguments)
 
-            pprint(
+            logger.debug(
                 {
                     "called_function": function_name,
                     "arguments": arguments,

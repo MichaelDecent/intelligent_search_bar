@@ -8,6 +8,8 @@ from app.functions.function_caller import (
 )
 
 ID = getenv("TEST_ID")
+if not ID:
+    pytest.skip("TEST_ID not set", allow_module_level=True)
 
 
 def test_generate_function_schema():
