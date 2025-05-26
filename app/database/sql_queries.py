@@ -13,9 +13,9 @@ def get_recent_transactions(account_id: str):
     Returns:
         List[Dict]: A list of the 3 most recent transaction records with the required columns.
     """
-    query = f"""
+    query = """
         WITH recent_transactions AS (
-            SELECT 
+            SELECT
                 amount,
                 transaction_type,
                 category,
@@ -23,16 +23,16 @@ def get_recent_transactions(account_id: str):
                 balance_after,
                 currency
             FROM new_table
-            WHERE account_id = '{account_id}'
+            WHERE account_id = %s
             ORDER BY "date" DESC
             LIMIT 3
         )
-        SELECT 
+        SELECT
             rt.*,
             (SELECT SUM(amount) FROM recent_transactions) as total_amount_of_3_transactions
         FROM recent_transactions rt;
     """
-    return execute_sql(query)
+    return execute_sql(query, (account_id,))
 
 
 def get_current_balance(account_id: str):
@@ -45,16 +45,16 @@ def get_current_balance(account_id: str):
     Returns:
         Dict: The current balance and currency from the most recent transaction.
     """
-    query = f"""
-        SELECT 
+    query = """
+        SELECT
             balance_after,
             currency
         FROM new_table
-        WHERE account_id = '{account_id}'
+        WHERE account_id = %s
         ORDER BY "date" DESC
         LIMIT 1;
     """
-    return execute_sql(query)
+    return execute_sql(query, (account_id,))
 
 
 def get_all_transactions(account_id: str):
@@ -71,12 +71,12 @@ def get_all_transactions(account_id: str):
               highest_credit_category, highest_credit_amount, highest_debit_category,
               highest_debit_amount, and their respective currencies.
     """
-    query = f"""
+    query = """
         WITH highest_credit AS (
             SELECT category, SUM(amount) AS credit_sum, currency
             FROM new_table
             WHERE transaction_type ILIKE '%credit%'
-              AND account_id = '{account_id}'
+              AND account_id = %s
             GROUP BY category, currency
             ORDER BY credit_sum DESC
             LIMIT 1
@@ -85,7 +85,7 @@ def get_all_transactions(account_id: str):
             SELECT category, SUM(amount) AS debit_sum, currency
             FROM new_table
             WHERE transaction_type ILIKE '%debit%'
-              AND account_id = '{account_id}'
+              AND account_id = %s
             GROUP BY category, currency
             ORDER BY debit_sum DESC
             LIMIT 1
@@ -97,12 +97,12 @@ def get_all_transactions(account_id: str):
                 SUM(CASE WHEN transaction_type ILIKE '%credit%' THEN amount ELSE 0 END) AS total_credit,
                 SUM(CASE WHEN transaction_type ILIKE '%debit%' THEN amount ELSE 0 END) AS total_debit
             FROM new_table
-            WHERE account_id = '{account_id}'
+            WHERE account_id = %s
             GROUP BY currency
             ORDER BY total_amount DESC
             LIMIT 1
         )
-        SELECT 
+        SELECT
             total_amount,
             total_credit,
             total_debit,
@@ -115,7 +115,7 @@ def get_all_transactions(account_id: str):
             (SELECT currency FROM highest_debit) AS highest_debit_currency
         FROM total_amounts;
     """
-    return execute_sql(query)
+    return execute_sql(query, (account_id, account_id, account_id))
 
 
 def get_transactions_by_date(date_str: str, account_id: str):
@@ -131,18 +131,18 @@ def get_transactions_by_date(date_str: str, account_id: str):
         List[Dict]: A list of transaction records with the individual amount, currency, category,
                     transaction type and bank name.
     """
-    query = f"""
-        SELECT 
+    query = """
+        SELECT
             amount,
             currency,
-            category, 
+            category,
             transaction_type,
             bank_name
         FROM new_table
-        WHERE DATE("date") = '{date_str}'
-          AND account_id = '{account_id}';
+        WHERE DATE("date") = %s
+          AND account_id = %s;
     """
-    return execute_sql(query)
+    return execute_sql(query, (date_str, account_id))
 
 
 def get_transactions_between_dates(start_date: str, end_date: str, account_id: str):
@@ -159,18 +159,18 @@ def get_transactions_between_dates(start_date: str, end_date: str, account_id: s
         List[Dict]: A list of transaction records with the amount, currency, category,
                     transaction_type and bank_name between the specified dates.
     """
-    query = f"""
-        SELECT 
+    query = """
+        SELECT
             amount,
             currency,
             category,
             transaction_type,
             bank_name
         FROM new_table
-        WHERE "date" BETWEEN '{start_date}' AND '{end_date} 23:59:59'
-          AND account_id = '{account_id}';
+        WHERE "date" BETWEEN %s AND (%s || ' 23:59:59')
+          AND account_id = %s;
     """
-    return execute_sql(query)
+    return execute_sql(query, (start_date, end_date, account_id))
 
 
 def get_transactions_last_month(account_id: str):
@@ -190,13 +190,13 @@ def get_transactions_last_month(account_id: str):
     Returns:
         Dict: A dictionary containing the aggregated values for transactions with currencies.
     """
-    query = f"""
+    query = """
         WITH last_month AS (
             SELECT *
             FROM new_table
             WHERE "date" >= date_trunc('month', current_date - interval '1 month')
               AND "date" < date_trunc('month', current_date)
-              AND account_id = '{account_id}'
+              AND account_id = %s
         ),
         highest_spent_category AS (
             SELECT category, SUM(amount) AS total_spent, currency
@@ -229,7 +229,7 @@ def get_transactions_last_month(account_id: str):
             (SELECT currency FROM highest_spent_category) AS highest_spent_currency
         FROM totals;
     """
-    return execute_sql(query)
+    return execute_sql(query, (account_id,))
 
 
 def get_transactions_over(amount: float, account_id: str):
@@ -244,18 +244,18 @@ def get_transactions_over(amount: float, account_id: str):
     Returns:
         List[Dict]: A list of transaction records with the specified columns.
     """
-    query = f"""
-        SELECT 
+    query = """
+        SELECT
             amount,
             currency,
             category,
             transaction_type,
             bank_name
         FROM new_table
-        WHERE amount > {amount}
-          AND account_id = '{account_id}';
+        WHERE amount > %s
+          AND account_id = %s;
     """
-    return execute_sql(query)
+    return execute_sql(query, (amount, account_id))
 
 
 def get_transactions_below(amount: float, account_id: str):
@@ -263,18 +263,18 @@ def get_transactions_below(amount: float, account_id: str):
     List individual transaction amounts, currency, category, transaction type, and bank name for transactions \
     below a specified amount for the given account.
     """
-    query = f"""
-        SELECT 
+    query = """
+        SELECT
             amount,
             currency,
-            category, 
+            category,
             transaction_type,
             bank_name
         FROM new_table
-        WHERE amount < {amount}
-          AND account_id = '{account_id}';
+        WHERE amount < %s
+          AND account_id = %s;
     """
-    return execute_sql(query)
+    return execute_sql(query, (amount, account_id))
 
 
 def get_deposits(account_id: str):
@@ -287,20 +287,20 @@ def get_deposits(account_id: str):
     Returns:
         Dict: Contains total_deposits, currency and category with highest deposit amount
     """
-    query = f"""
+    query = """
         WITH deposit_totals AS (
-            SELECT 
+            SELECT
                 category,
                 SUM(amount) as category_total,
                 currency
-            FROM new_table 
+            FROM new_table
             WHERE transaction_type ILIKE '%credit%'
-                AND account_id = '{account_id}'
+                AND account_id = %s
             GROUP BY category, currency
             ORDER BY category_total DESC
             LIMIT 1
         )
-        SELECT 
+        SELECT
             COALESCE(SUM(amount), 0) as total_deposits,
             (SELECT currency FROM deposit_totals) as total_deposits_currency,
             (SELECT category FROM deposit_totals) as highest_deposit_category,
@@ -308,9 +308,9 @@ def get_deposits(account_id: str):
             (SELECT currency FROM deposit_totals) as highest_category_currency
         FROM new_table
         WHERE transaction_type ILIKE '%credit%'
-            AND account_id = '{account_id}';
+            AND account_id = %s;
     """
-    return execute_sql(query)
+    return execute_sql(query, (account_id, account_id))
 
 
 def get_withdrawals(account_id: str):
@@ -323,20 +323,20 @@ def get_withdrawals(account_id: str):
     Returns:
         Dict: Contains total_withdrawals, currency and category with highest withdrawal amount
     """
-    query = f"""
+    query = """
         WITH withdrawal_totals AS (
-            SELECT 
+            SELECT
                 category,
                 SUM(amount) as category_total,
                 currency
-            FROM new_table 
+            FROM new_table
             WHERE transaction_type ILIKE '%debit%'
-                AND account_id = '{account_id}'
+                AND account_id = %s
             GROUP BY category, currency
             ORDER BY category_total DESC
             LIMIT 1
         )
-        SELECT 
+        SELECT
             COALESCE(SUM(amount), 0) as total_withdrawals,
             (SELECT currency FROM withdrawal_totals) as total_withdrawals_currency,
             (SELECT category FROM withdrawal_totals) as highest_withdrawal_category,
@@ -344,9 +344,9 @@ def get_withdrawals(account_id: str):
             (SELECT currency FROM withdrawal_totals) as highest_category_currency
         FROM new_table
         WHERE transaction_type ILIKE '%debit%'
-            AND account_id = '{account_id}';
+            AND account_id = %s;
     """
-    return execute_sql(query)
+    return execute_sql(query, (account_id, account_id))
 
 
 def get_transactions_by_category(category: str, account_id: str):
@@ -362,20 +362,20 @@ def get_transactions_by_category(category: str, account_id: str):
         Dict: A dictionary containing 'credit_amount', 'debit_amount', 'total_amount'
               and their respective currencies.
     """
-    query = f"""
-        SELECT 
+    query = """
+        SELECT
             SUM(CASE WHEN transaction_type ILIKE '%credit%' THEN amount ELSE 0 END) AS credit_amount,
             SUM(CASE WHEN transaction_type ILIKE '%debit%' THEN amount ELSE 0 END) AS debit_amount,
             SUM(amount) AS total_amount,
             MAX(currency) AS currency
         FROM new_table
-        WHERE category ILIKE '{category}'
-          AND account_id = '{account_id}'
+        WHERE category ILIKE %s
+          AND account_id = %s
         GROUP BY currency
         ORDER BY total_amount DESC
         LIMIT 1;
     """
-    return execute_sql(query)
+    return execute_sql(query, (category, account_id))
 
 
 def get_transactions_by_account_number(account_number: str, account_id: str):
@@ -389,20 +389,20 @@ def get_transactions_by_account_number(account_number: str, account_id: str):
     Returns:
         Dict: A dictionary containing credit_amount, debit_amount, total_amount and their currencies.
     """
-    query = f"""
-        SELECT 
+    query = """
+        SELECT
             SUM(CASE WHEN transaction_type ILIKE '%credit%' THEN amount ELSE 0 END) AS credit_amount,
             SUM(CASE WHEN transaction_type ILIKE '%debit%' THEN amount ELSE 0 END) AS debit_amount,
             SUM(amount) AS total_amount,
             MAX(currency) AS currency
         FROM new_table
-        WHERE account_number = '{account_number}'
-          AND account_id = '{account_id}'
+        WHERE account_number = %s
+          AND account_id = %s
         GROUP BY currency
         ORDER BY total_amount DESC
         LIMIT 1;
     """
-    return execute_sql(query)
+    return execute_sql(query, (account_number, account_id))
 
 
 def get_transactions_by_bank_name(bank_name: str, account_id: str):
@@ -416,20 +416,20 @@ def get_transactions_by_bank_name(bank_name: str, account_id: str):
     Returns:
         Dict: A dictionary containing credit_amount, debit_amount, total_amount and their currencies.
     """
-    query = f"""
-        SELECT 
+    query = """
+        SELECT
             SUM(CASE WHEN transaction_type ILIKE '%credit%' THEN amount ELSE 0 END) AS credit_amount,
             SUM(CASE WHEN transaction_type ILIKE '%debit%' THEN amount ELSE 0 END) AS debit_amount,
             SUM(amount) AS total_amount,
             MAX(currency) AS currency
         FROM new_table
-        WHERE bank_name ILIKE '{bank_name}'
-          AND account_id = '{account_id}'
+        WHERE bank_name ILIKE %s
+          AND account_id = %s
         GROUP BY currency
         ORDER BY total_amount DESC
         LIMIT 1;
     """
-    return execute_sql(query)
+    return execute_sql(query, (bank_name, account_id))
 
 
 def get_transactions_by_account_id(account_id: str):
@@ -442,19 +442,19 @@ def get_transactions_by_account_id(account_id: str):
     Returns:
         Dict: A dictionary containing credit_amount, debit_amount, total_amount and their currencies for the account.
     """
-    query = f"""
-        SELECT 
+    query = """
+        SELECT
             SUM(CASE WHEN transaction_type ILIKE '%credit%' THEN amount ELSE 0 END) AS credit_amount,
             SUM(CASE WHEN transaction_type ILIKE '%debit%' THEN amount ELSE 0 END) AS debit_amount,
             SUM(amount) AS total_amount,
             MAX(currency) AS currency
         FROM new_table
-        WHERE account_id = '{account_id}'
+        WHERE account_id = %s
         GROUP BY currency
         ORDER BY total_amount DESC
         LIMIT 1;
     """
-    return execute_sql(query)
+    return execute_sql(query, (account_id,))
 
 
 def get_transactions_by_currency(currency: str, account_id: str):
@@ -468,16 +468,16 @@ def get_transactions_by_currency(currency: str, account_id: str):
     Returns:
         Dict: A dictionary containing credit_amount, debit_amount, total_amount and their currencies.
     """
-    query = f"""
-        SELECT 
+    query = """
+        SELECT
             SUM(CASE WHEN transaction_type ILIKE '%credit%' THEN amount ELSE 0 END) AS credit_amount,
             SUM(CASE WHEN transaction_type ILIKE '%debit%' THEN amount ELSE 0 END) AS debit_amount,
             SUM(amount) AS total_amount
         FROM new_table
-        WHERE currency = '{currency}'
-          AND account_id = '{account_id}';
+        WHERE currency = %s
+          AND account_id = %s;
     """
-    return execute_sql(query)
+    return execute_sql(query, (currency, account_id))
 
 
 def get_withdrawals_over_last_days(amount: float, account_id: str, days: int = 30):
@@ -493,13 +493,13 @@ def get_withdrawals_over_last_days(amount: float, account_id: str, days: int = 3
         Dict: Contains total sum, amount spent, amount received,\
         and highest spending category with amount and currencies.
     """
-    query = f"""
+    query = """
         WITH filtered_transactions AS (
             SELECT *
-            FROM new_table 
-            WHERE amount > {amount}
-              AND "date" >= current_date - interval '{days} days'
-              AND account_id = '{account_id}'
+            FROM new_table
+            WHERE amount > %s
+              AND "date" >= current_date - (%s || ' days')::interval
+              AND account_id = %s
         ),
         top_category AS (
             SELECT category, SUM(amount) as category_total, currency
@@ -532,7 +532,7 @@ def get_withdrawals_over_last_days(amount: float, account_id: str, days: int = 3
             (SELECT currency FROM top_category) as highest_category_currency
         FROM totals;
     """
-    return execute_sql(query)
+    return execute_sql(query, (amount, days, account_id))
 
 
 def get_transactions_by_bank_and_category(
@@ -549,22 +549,22 @@ def get_transactions_by_bank_and_category(
     Returns:
         Dict: Contains total sum, amount spent (debits), and amount received (credits) with their currencies.
     """
-    query = f"""
+    query = """
         WITH totals AS (
-            SELECT 
+            SELECT
                 SUM(amount) as total_sum,
                 SUM(CASE WHEN transaction_type ILIKE '%debit%' THEN amount ELSE 0 END) as total_spent,
                 SUM(CASE WHEN transaction_type ILIKE '%credit%' THEN amount ELSE 0 END) as total_received,
                 currency
             FROM new_table
-            WHERE bank_name ILIKE '{bank_name}'
-              AND category ILIKE '{category}'
-              AND account_id = '{account_id}'
+            WHERE bank_name ILIKE %s
+              AND category ILIKE %s
+              AND account_id = %s
             GROUP BY currency
             ORDER BY total_sum DESC
             LIMIT 1
         )
-        SELECT 
+        SELECT
             COALESCE(total_sum, 0) as total_sum,
             currency as total_currency,
             COALESCE(total_spent, 0) as total_spent,
@@ -573,7 +573,7 @@ def get_transactions_by_bank_and_category(
             currency as received_currency
         FROM totals;
     """
-    return execute_sql(query)
+    return execute_sql(query, (bank_name, category, account_id))
 
 
 def get_transactions_between_amounts_and_category(
@@ -591,13 +591,13 @@ def get_transactions_between_amounts_and_category(
     Returns:
         Dict: Contains total sum, amount spent, amount received, and highest spending category details with currencies
     """
-    query = f"""
+    query = """
         WITH filtered_transactions AS (
             SELECT *
             FROM new_table
-            WHERE amount BETWEEN {min_amount} AND {max_amount}
-              AND category ILIKE '{category}'
-              AND account_id = '{account_id}'
+            WHERE amount BETWEEN %s AND %s
+              AND category ILIKE %s
+              AND account_id = %s
         ),
         top_category AS (
             SELECT category, SUM(amount) as category_total, currency
@@ -630,7 +630,7 @@ def get_transactions_between_amounts_and_category(
             (SELECT currency FROM top_category) as highest_category_currency
         FROM totals;
     """
-    return execute_sql(query)
+    return execute_sql(query, (min_amount, max_amount, category, account_id))
 
 
 def get_transactions_updated_since(specific_date: str, account_id: str):
@@ -644,12 +644,12 @@ def get_transactions_updated_since(specific_date: str, account_id: str):
     Returns:
         Dict: Contains total sum, amount spent, amount received, and highest spending category with amount.
     """
-    query = f"""
+    query = """
         WITH filtered_transactions AS (
             SELECT *
             FROM new_table
-            WHERE updated_at >= '{specific_date}'
-              AND account_id = '{account_id}'
+            WHERE updated_at >= %s
+              AND account_id = %s
         ),
         highest_spend_category AS (
             SELECT category, SUM(amount) as category_total
@@ -667,7 +667,7 @@ def get_transactions_updated_since(specific_date: str, account_id: str):
             (SELECT category_total FROM highest_spend_category) as highest_spend_amount
         FROM filtered_transactions;
     """
-    return execute_sql(query)
+    return execute_sql(query, (specific_date, account_id))
 
 
 def get_transactions_created_last_week(account_id: str):
@@ -680,12 +680,12 @@ def get_transactions_created_last_week(account_id: str):
     Returns:
         Dict: Contains total sum, amount spent, amount received, and top spending category with amount and currencies.
     """
-    query = f"""
+    query = """
         WITH last_week_transactions AS (
             SELECT *
             FROM new_table
             WHERE created_at >= current_date - interval '7 days'
-              AND account_id = '{account_id}'
+              AND account_id = %s
         ),
         top_spending_category AS (
             SELECT 
@@ -721,7 +721,7 @@ def get_transactions_created_last_week(account_id: str):
             (SELECT currency FROM top_spending_category) as highest_spend_currency
         FROM totals;
     """
-    return execute_sql(query)
+    return execute_sql(query, (account_id,))
 
 
 def get_transactions_by_keyword(keyword: str, account_id: str):
@@ -739,18 +739,19 @@ def get_transactions_by_keyword(keyword: str, account_id: str):
     query = f"""
         SELECT
             SUM(CASE WHEN transaction_type ILIKE '%credit%' THEN amount ELSE 0 END) AS credit_amount_{keyword},
-            SUM(CASE WHEN transaction_type ILIKE '%debit%' THEN amount ELSE 0 END) AS debit_amount_{keyword}, 
+            SUM(CASE WHEN transaction_type ILIKE '%debit%' THEN amount ELSE 0 END) AS debit_amount_{keyword},
             SUM(amount) AS total_amount_{keyword},
             MAX(currency) as currency
         FROM new_table
-        WHERE account_id = '{account_id}'
+        WHERE account_id = %s
           AND (
-              bank_name ILIKE '%{keyword}%' OR
-              category ILIKE '%{keyword}%' OR
-              transaction_type ILIKE '%{keyword}%'
+              bank_name ILIKE %s OR
+              category ILIKE %s OR
+              transaction_type ILIKE %s
           )
         GROUP BY currency
         ORDER BY total_amount_{keyword} DESC
         LIMIT 1;
     """
-    return execute_sql(query)
+    like_pattern = f"%{keyword}%"
+    return execute_sql(query, (account_id, like_pattern, like_pattern, like_pattern))

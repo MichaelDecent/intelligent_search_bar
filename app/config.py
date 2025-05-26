@@ -12,7 +12,8 @@ DESCRIPTION = "API for handling user queries and returning financial insights."
 
 API_PREFIX = "/api/v1"
 
-ALLOWED_HOSTS = getenv("ALLOWED_HOSTS").split(",")
+allowed_hosts = getenv("ALLOWED_HOSTS", "")
+ALLOWED_HOSTS = allowed_hosts.split(",") if allowed_hosts else []
 
 
 # Database Configuration

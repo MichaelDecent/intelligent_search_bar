@@ -27,6 +27,9 @@ from app.database.sql_queries import (
 load_dotenv()
 
 ID = getenv("TEST_ID")
+if not ID:
+    import pytest
+    pytest.skip("TEST_ID not set", allow_module_level=True)
 
 
 def test_execute_sql():
